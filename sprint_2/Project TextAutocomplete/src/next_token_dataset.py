@@ -13,30 +13,25 @@ from utils import load_config
 class TextAutocompleteDataset(Dataset):
     def __init__(self, data: List[List[int]]):
         """
-        Для каждой последовательности [w1, w2, w3, ..., wn] создаем:
-        - X: первые 3/4 последовательности
-        - Y: оставшиеся 1/4 последовательности
+        Для next-token prediction:
+        - X: последовательность без последнего токена
+        - Y: последовательность без первого токена
         """
         self.x_sequences = []
         self.y_sequences = []
 
-        # Используем numpy для эффективной обработки
         for message in data:
-            if len(message) < 2:  # Нужно минимум 2 токена для создания пары
+            if len(message) < 2:  # Нужно минимум 2 токена
                 continue
 
-            message_array = np.array(message)
+            # Для последовательности [w1, w2, w3, w4]:
+            # X = [w1, w2, w3] (вход)
+            # Y = [w2, w3, w4] (цель - следующие токены)
+            x_seq = message[:-1]
+            y_seq = message[1:]
 
-            # Определяем точку разделения - 3/4 длины последовательности
-            split_idx = max(1, int(len(message_array) * 0.75))
-
-            # X: первые 3/4 последовательности
-            x_seq = message_array[:split_idx]
-            # Y: оставшиеся 1/4 последовательности
-            y_seq = message_array[split_idx:]
-
-            self.x_sequences.append(x_seq.tolist())
-            self.y_sequences.append(y_seq.tolist())
+            self.x_sequences.append(x_seq)
+            self.y_sequences.append(y_seq)
 
         print(f"Created {len(self.x_sequences)} training pairs from {len(data)} messages")
 
