@@ -68,6 +68,28 @@ def load_and_preprocess_data(file_path: str) -> List:
         raise
 
 
+# кастомная функция collate_fn для формирования батчей
+def collate_fn(batch):
+    config = load_config("dataset_config.yaml")
+    tokenizer_name = config["tokenizer"]
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+    if tokenizer.pad_token is None:
+        tokenizer.add_special_tokens({'pad_token': '<PAD>'})
+
+    input_seq = [item['x'] for item in batch]
+    target_seq = [item['y'] for item in batch]
+    lengths = torch.tensor([len(seq) for seq in input_seq])
+
+    padded_sequences = pad_sequence(input_seq, batch_first=True, padding_value=tokenizer.pad_token_id)
+    padded_targets = pad_sequence(target_seq, batch_first=True, padding_value=tokenizer.pad_token_id)
+
+    return {
+        'input_seq': padded_sequences,
+        'lengths': lengths,
+        'target_seq': padded_targets
+    }
+
+
 def create_dataloader(debug:bool = False) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Создаёт Dataloader для исходного датасета.
@@ -103,35 +125,41 @@ def create_dataloader(debug:bool = False) -> Tuple[DataLoader, DataLoader, DataL
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        drop_last=True  # Удалять последний неполный батч
+        collate_fn = collate_fn,
+        num_workers=4
     )
 
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
-        drop_last=True  # Удалять последний неполный батч
+        collate_fn = collate_fn,
+        num_workers=4
     )
 
     test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
-        drop_last=True  # Удалять последний неполный батч
+        collate_fn = collate_fn,
+        num_workers=4
     )
 
     if debug:
         print("\n=== TRAIN DATASET INFO ===")
         print(f"Train dataset size: {len(train_dataset)}")
         print(f"Train batches: {len(train_loader)}")
+        print(f"Train batch example: {next(iter(train_loader))}")
 
         print("\n=== VALIDATION DATASET INFO ===")
         print(f"Validation dataset size: {len(val_dataset)}")
         print(f"Validation batches: {len(val_loader)}")
+        print(f"Validation batch example: {next(iter(val_loader))}")
 
         print("\n=== TEST DATASET INFO ===")
         print(f"Test dataset size: {len(test_dataset)}")
         print(f"Test batches: {len(test_loader)}")
+        print(f"Test batch example: {next(iter(test_loader))}")
 
     return train_loader, val_loader, test_loader
 
