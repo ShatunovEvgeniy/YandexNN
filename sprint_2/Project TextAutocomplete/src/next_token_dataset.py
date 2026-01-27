@@ -4,7 +4,8 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 from torch.nn.utils.rnn import pad_sequence
 import torch
-from typing import Tuple, List
+from typing import Tuple, List, Dict, Any
+from functools import partial
 
 from utils import load_config
 
@@ -55,10 +56,13 @@ def load_and_preprocess_data(file_path: str) -> List:
     """
     try:
         data = []
+        i = 0
         with open(file_path, 'r', encoding='utf-8') as file:
             for line in file:
                 tokens = [int(token) for token in line.strip().split() if token.strip()]
                 data.append(tokens)
+                i += 1
+                if i == 10: break
 
         print(f"Successfully loaded {len(data)} data points from {file_path}")
         return data
@@ -69,19 +73,13 @@ def load_and_preprocess_data(file_path: str) -> List:
 
 
 # кастомная функция collate_fn для формирования батчей
-def collate_fn(batch):
-    config = load_config("dataset_config.yaml")
-    tokenizer_name = config["tokenizer"]
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
-    if tokenizer.pad_token is None:
-        tokenizer.add_special_tokens({'pad_token': '<PAD>'})
-
+def _collate_fn(batch, pad_token_id: int) -> Dict[str, Any]:
     input_seq = [item['x'] for item in batch]
     target_seq = [item['y'] for item in batch]
     lengths = torch.tensor([len(seq) for seq in input_seq])
 
-    padded_sequences = pad_sequence(input_seq, batch_first=True, padding_value=tokenizer.pad_token_id)
-    padded_targets = pad_sequence(target_seq, batch_first=True, padding_value=tokenizer.pad_token_id)
+    padded_sequences = pad_sequence(input_seq, batch_first=True, padding_value=pad_token_id)
+    padded_targets = pad_sequence(target_seq, batch_first=True, padding_value=pad_token_id)
 
     return {
         'input_seq': padded_sequences,
@@ -90,7 +88,7 @@ def collate_fn(batch):
     }
 
 
-def create_dataloader(debug:bool = False) -> Tuple[DataLoader, DataLoader, DataLoader]:
+def create_dataloaders(debug:bool = False) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Создаёт Dataloader для исходного датасета.
     :param debug: Нужна ли отладочная информация по датасету.
@@ -118,6 +116,17 @@ def create_dataloader(debug:bool = False) -> Tuple[DataLoader, DataLoader, DataL
     train_dataset = TextAutocompleteDataset(train_data)
     val_dataset = TextAutocompleteDataset(val_data)
     test_dataset = TextAutocompleteDataset(test_data)
+
+    # Загрузка токенизатора
+    tokenizer_name = config['tokenizer']
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+    if tokenizer.pad_token is None:
+        tokenizer.add_special_tokens({'pad_token': config['pad_token']})
+
+    collate_fn = partial(
+        _collate_fn,
+        pad_token_id=tokenizer.pad_token_id
+    )
 
     # Создание DataLoader
     batch_size = config["batch_size"]
@@ -164,4 +173,4 @@ def create_dataloader(debug:bool = False) -> Tuple[DataLoader, DataLoader, DataL
     return train_loader, val_loader, test_loader
 
 if __name__ == "__main__":
-    train_loader, val_loader, test_loader = create_dataloader(debug=True)
+    train_loader, val_loader, test_loader = create_dataloaders(debug=True)
