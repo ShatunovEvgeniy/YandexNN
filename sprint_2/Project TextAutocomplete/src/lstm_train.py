@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from clearml import Task, Logger
-import os
 import os.path
 
 from utils import load_config
@@ -144,7 +143,7 @@ if __name__ == "__main__":
         Logger.current_logger().report_scalar("val", "loss", iteration=epoch, value=val_loss)
         Logger.current_logger().report_scalar("val", "ROUGE1", iteration=epoch, value=val_rouge1)
         Logger.current_logger().report_scalar("val", "ROUGE2", iteration=epoch, value=val_rouge2)
-        print(f'Val Loss: {val_loss:.4f}, Val ROUGE1: {val_rouge1:.2f}%, , Val ROUGE2: {val_rouge2:.2f}%')
+        print(f'Val Loss: {val_loss:.4f}, Val ROUGE1: {val_rouge1:.2f}%, Val ROUGE2: {val_rouge2:.2f}%')
 
         # Сохранение лучшей модели по валидационной потере
         if val_loss < best_val_loss:
