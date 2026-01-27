@@ -22,7 +22,7 @@ def train_epoch(model: nn.Module,
     total_rouge2 = 0
     batch_count = 0
 
-    for batch in loader:
+    for i, batch in enumerate(loader):
         input_seq = batch['input_seq'].to(device)
         lengths = batch['lengths']
         target_seq = batch['target_seq'].to(device)
@@ -45,10 +45,26 @@ def train_epoch(model: nn.Module,
         target_text = model.tokenizer.batch_decode(target_seq, skip_special_tokens=True)
 
         # Вычисляем ROUGE метрики
-        metrics = calculate_rouge_metrics(output_text, target_text)
-        total_rouge1 += metrics['rouge1']
-        total_rouge2 += metrics['rouge2']
-        batch_count += 1
+        if i % 10 == 0:  # Вычислять метрики реже
+            # Декодируем только небольшую часть для экономии памяти
+            with torch.no_grad():
+                sample_size = min(8, input_seq.size(0))  # Берем только 8 примеров
+                sample_logits = logits[:sample_size]
+                sample_target = target_seq[:sample_size]
+
+                probs = torch.softmax(sample_logits, dim=-1)
+                output_indices = torch.argmax(probs, dim=-1)
+                output_text = model.tokenizer.batch_decode(output_indices, skip_special_tokens=True)
+                target_text = model.tokenizer.batch_decode(sample_target, skip_special_tokens=True)
+
+                metrics = calculate_rouge_metrics(output_text, target_text)
+                total_rouge1 += metrics['rouge1']
+                total_rouge2 += metrics['rouge2']
+                batch_count += 1
+
+        # Принудительная очистка памяти после каждого батча
+        del input_seq, lengths, target_seq, logits, loss
+        torch.cuda.empty_cache()
 
     avg_loss = total_loss / len(loader)
     avg_rouge1 = total_rouge1 / batch_count if batch_count > 0 else 0
@@ -63,8 +79,9 @@ def evaluate(model: nn.Module, criterion, loader: DataLoader, device) -> tuple:
     total_loss = 0
     batch_count = 0
 
-    with torch.no_grad():
-        for batch in loader:
+    # Использование смешанной точности для инференса
+    with torch.no_grad(), torch.cuda.amp.autocast():
+        for i, batch in enumerate(loader):
             input_seq = batch['input_seq'].to(device)
             lengths = batch['lengths']
             target_seq = batch['target_seq'].to(device)
@@ -74,16 +91,25 @@ def evaluate(model: nn.Module, criterion, loader: DataLoader, device) -> tuple:
                              target_seq.reshape(-1))
             total_loss += loss.item()
 
-            # Декодируем предсказания и цели в текст
-            probs = torch.softmax(logits, dim=-1)
-            output_indices = torch.argmax(probs, dim=-1)
-            output_text = model.tokenizer.batch_decode(output_indices, skip_special_tokens=True)
-            target_text = model.tokenizer.batch_decode(target_seq, skip_special_tokens=True)
+            # Вычисление метрик только для каждого 5-го батча
+            if i % 5 == 0:
+                sample_size = min(4, input_seq.size(0))  # Еще меньше примеров для валидации
+                sample_logits = logits[:sample_size]
+                sample_target = target_seq[:sample_size]
 
-            metrics = calculate_rouge_metrics(output_text, target_text)
-            total_rouge1 += metrics['rouge1']
-            total_rouge2 += metrics['rouge2']
-            batch_count += 1
+                probs = torch.softmax(sample_logits, dim=-1)
+                output_indices = torch.argmax(probs, dim=-1)
+                output_text = model.tokenizer.batch_decode(output_indices, skip_special_tokens=True)
+                target_text = model.tokenizer.batch_decode(sample_target, skip_special_tokens=True)
+
+                metrics = calculate_rouge_metrics(output_text, target_text)
+                total_rouge1 += metrics['rouge1']
+                total_rouge2 += metrics['rouge2']
+                batch_count += 1
+
+            # Очистка памяти
+            del input_seq, lengths, target_seq, logits, loss
+            torch.cuda.empty_cache()
 
     avg_loss = total_loss / len(loader)
     avg_rouge1 = total_rouge1 / batch_count if batch_count > 0 else 0
@@ -92,6 +118,8 @@ def evaluate(model: nn.Module, criterion, loader: DataLoader, device) -> tuple:
 
 
 if __name__ == "__main__":
+    os.environ['PYTORCH_ALLOC_CONF'] = 'expandable_segments:True'
+
     task = Task.init(project_name='TextAutocomplete', task_name='Train')
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
