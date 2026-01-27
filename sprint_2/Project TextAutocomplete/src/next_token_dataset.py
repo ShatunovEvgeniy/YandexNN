@@ -10,46 +10,59 @@ from utils import load_config
 
 
 class TextAutocompleteDataset(Dataset):
-    def __init__(self, data, window_size=3):
+    def __init__(self, data: List[List[int]]):
         """
-        data: numpy array или torch tensor с временными рядами
-        window_size: размер окна для последовательности (3 для [x(t-1), x(t), x(t+1)])
+        Для каждой последовательности [w1, w2, w3, ..., wn] создаем:
+        - X: [w1], [w1, w2], [w1, w2, w3], ..., [w1, w2, ..., w_{n-1}]
+        - Y: [w2], [w2, w3], [w2, w3, w4], ..., [w2, w3, ..., wn]
         """
-        self.data = torch.tensor(data, dtype=torch.float32)
-        self.window_size = window_size
+        self.x_sequences = []
+        self.y_sequences = []
 
-        # Проверка, что данных достаточно для создания хотя бы одной последовательности
-        if len(self.data) < window_size + 1:
-            raise ValueError(f"Data length {len(self.data)} is too short for window size {window_size}")
+        # Используем numpy для эффективной обработки
+        for message in data:
+            if len(message) < 2:  # Нужно минимум 2 токена для создания пары
+                continue
+
+            message_array = np.array(message)
+
+            # Создаем все возможные префиксы и соответствующие им продолжения
+            for i in range(1, len(message)):
+                # X: последовательность от начала до i-го элемента (включительно)
+                x_seq = message_array[:i]
+                # Y: последовательность от 1-го до i+1-го элемента
+                y_seq = message_array[1:i + 1]
+
+                self.x_sequences.append(x_seq.tolist())
+                self.y_sequences.append(y_seq.tolist())
+
+        print(f"Created {len(self.x_sequences)} training pairs from {len(data)} messages")
 
     def __len__(self):
-        # Количество возможных последовательностей
-        return len(self.data) - self.window_size
+        return len(self.x_sequences)
 
     def __getitem__(self, idx):
-        """
-        Возвращает:
-        x: [x(t-1), x(t), x(t+1)] для индекса idx
-        y: [y(t), y(t+1), y(t+2)] для индекса idx
-        """
-        # Входная последовательность: [x(t-1), x(t), x(t+1)]
-        x = self.data[idx:idx + self.window_size]
-
-        # Целевая последовательность: [x(t), x(t+1), x(t+2)]
-        y = self.data[idx + 1:idx + self.window_size + 1]
-
-        return x, y
+        return {
+            'x': torch.tensor(self.x_sequences[idx], dtype=torch.long),
+            'y': torch.tensor(self.y_sequences[idx], dtype=torch.long)
+        }
 
 
-def load_and_preprocess_data(file_path: str) -> np.array:
+def load_and_preprocess_data(file_path: str) -> List:
     """
-    Читает txt файл с числами, разделенными пробелами
+    Читает txt файл, где каждая строка содержит числа (токены), разделенные пробелами.
+    Возвращает одномерный массив всех токенов.
     """
     try:
-        # Чтение данных из файла
-        data = np.loadtxt(file_path, delimiter=' ')
-        print(f"Successfully loaded {len(data)} data points")
+        data = []
+        with open(file_path, 'r', encoding='utf-8') as file:
+            for line in file:
+                tokens = [int(token) for token in line.strip().split() if token.strip()]
+                data.append(tokens)
+
+        print(f"Successfully loaded {len(data)} data points from {file_path}")
         return data
+
     except Exception as e:
         print(f"Error loading data: {e}")
         raise
