@@ -90,40 +90,37 @@ if __name__ == "__main__":
         f.write('')  # Очищаем файл
     print(f"Выходной файл подготовлен: {processed_file_path}")
 
-    # Параметры обработки
-    chunk_size = data_config.get("chunk_size", 10000)  # Размер кусочка в символах
-    total_chars = len(raw_data)
-    total_chunks = (total_chars + chunk_size - 1) // chunk_size  # Округление вверх
-    print(f"Начало обработки файла размером {total_chars} символов")
-    print(f"Размер кусочка: {chunk_size} символов")
-    print(f"Всего кусочков: {total_chunks}")
+    # Разделение текста на строки
+    lines = raw_data.splitlines()
+    total_lines = len(lines)
+    print(f"Начало обработки файла с {total_lines} строками")
 
     # Токенизатор
     tokenizer_name = data_config["tokenizer"]
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
-    # Обработка файла по кусочкам
-    for i in range(total_chunks):
-        start_idx = i * chunk_size
-        end_idx = min((i + 1) * chunk_size, total_chars)
-
-        # Извлечение кусочка
-        chunk = raw_data[start_idx:end_idx]
-        print(f"\nОбработка кусочка {i + 1}/{total_chunks} (символы {start_idx}-{end_idx})")
+    # Обработка файла по строкам
+    for i, line in enumerate(lines):
+        print(f"\nОбработка строки {i + 1}/{total_lines}")
 
         # Очистка текста
-        cleaned_chunk = clean_text(chunk)
-        print(f"Размер после очистки: {len(cleaned_chunk)} символов")
+        cleaned_line = clean_text(line)
+        if not cleaned_line:
+            print("Пустая строка после очистки, пропускаем")
+            continue
+
+        print(f"Размер после очистки: {len(cleaned_line)} символов")
 
         # Токенизация
-        tokenized_chunk = tokenizer.encode(cleaned_chunk)
-        print(f"Количество токенов: {len(tokenized_chunk)}")
+        tokenized_line = tokenizer.encode(cleaned_line)
+        tokenized_line.append(tokenizer.eos_token_id)  # Добавляем EOS в конец каждого предложения
+        print(f"Количество токенов: {len(tokenized_line)}")
 
         # Сохранение в файл (режим 'a' для добавления)
-        save_tokenized_data(tokenized_chunk, processed_file_path, mode='a')
+        save_tokenized_data(tokenized_line, processed_file_path, mode='a')
 
         # Прогресс
-        progress = ((i + 1) / total_chunks) * 100
+        progress = ((i + 1) / total_lines) * 100
         print(f"Прогресс: {progress:.1f}%")
 
     print(f"\nОбработка завершена!")
