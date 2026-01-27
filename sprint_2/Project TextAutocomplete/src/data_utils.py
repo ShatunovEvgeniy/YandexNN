@@ -66,7 +66,7 @@ def save_tokenized_data(tokens: List[int], output_file_path: str, mode: str = 'a
         with open(output_file_path, mode, encoding='utf-8') as f:
             # Записываем токены как строку с разделителями-пробелами
             tokens_str = ' '.join(map(str, tokens))
-            f.write(tokens_str)
+            f.write(tokens_str + '\n')
         print(f"Успешно записано {len(tokens)} токенов")
     except Exception as e:
         print(f"Ошибка при записи в файл: {e}")
