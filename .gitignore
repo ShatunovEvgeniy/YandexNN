@@ -181,3 +181,5 @@ cython_debug/
 .cursorindexingignore
 /sprint_1
 /.idea
+*.txt
+sprint_2/Project TextAutocomplete/sandbox.py
