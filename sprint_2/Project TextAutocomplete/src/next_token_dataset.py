@@ -14,8 +14,8 @@ class TextAutocompleteDataset(Dataset):
     def __init__(self, data: List[List[int]]):
         """
         Для каждой последовательности [w1, w2, w3, ..., wn] создаем:
-        - X: [w1], [w1, w2], [w1, w2, w3], ..., [w1, w2, ..., w_{n-1}]
-        - Y: [w2], [w2, w3], [w2, w3, w4], ..., [w2, w3, ..., wn]
+        - X: первые 3/4 последовательности
+        - Y: оставшиеся 1/4 последовательности
         """
         self.x_sequences = []
         self.y_sequences = []
@@ -27,15 +27,16 @@ class TextAutocompleteDataset(Dataset):
 
             message_array = np.array(message)
 
-            # Создаем все возможные префиксы и соответствующие им продолжения
-            for i in range(1, len(message)):
-                # X: последовательность от начала до i-го элемента (включительно)
-                x_seq = message_array[:i]
-                # Y: последовательность от 1-го до i+1-го элемента
-                y_seq = message_array[1:i + 1]
+            # Определяем точку разделения - 3/4 длины последовательности
+            split_idx = max(1, int(len(message_array) * 0.75))
 
-                self.x_sequences.append(x_seq.tolist())
-                self.y_sequences.append(y_seq.tolist())
+            # X: первые 3/4 последовательности
+            x_seq = message_array[:split_idx]
+            # Y: оставшиеся 1/4 последовательности
+            y_seq = message_array[split_idx:]
+
+            self.x_sequences.append(x_seq.tolist())
+            self.y_sequences.append(y_seq.tolist())
 
         print(f"Created {len(self.x_sequences)} training pairs from {len(data)} messages")
 
@@ -88,7 +89,7 @@ def _collate_fn(batch, pad_token_id: int) -> Dict[str, Any]:
     }
 
 
-def create_dataloaders(debug:bool = False) -> Tuple[DataLoader, DataLoader, DataLoader]:
+def create_dataloaders(debug: bool = False) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Создаёт Dataloader для исходного датасета.
     :param debug: Нужна ли отладочная информация по датасету.
@@ -134,7 +135,7 @@ def create_dataloaders(debug:bool = False) -> Tuple[DataLoader, DataLoader, Data
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        collate_fn = collate_fn,
+        collate_fn=collate_fn,
         num_workers=4
     )
 
@@ -142,7 +143,7 @@ def create_dataloaders(debug:bool = False) -> Tuple[DataLoader, DataLoader, Data
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
-        collate_fn = collate_fn,
+        collate_fn=collate_fn,
         num_workers=4
     )
 
@@ -150,7 +151,7 @@ def create_dataloaders(debug:bool = False) -> Tuple[DataLoader, DataLoader, Data
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
-        collate_fn = collate_fn,
+        collate_fn=collate_fn,
         num_workers=4
     )
 
@@ -171,6 +172,7 @@ def create_dataloaders(debug:bool = False) -> Tuple[DataLoader, DataLoader, Data
         print(f"Test batch example: {next(iter(test_loader))}")
 
     return train_loader, val_loader, test_loader
+
 
 if __name__ == "__main__":
     train_loader, val_loader, test_loader = create_dataloaders(debug=True)
