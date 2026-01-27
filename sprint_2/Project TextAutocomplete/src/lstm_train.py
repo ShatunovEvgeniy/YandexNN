@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from clearml import Task, Logger
+import os
+import os.path
 
 from utils import load_config
 from lstm_model import TextAutocompleteLSTM
@@ -118,6 +120,12 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.CrossEntropyLoss()
 
+    # Подготовка к сохранению модели
+    models_dir = os.path.join("..", "models")
+    os.makedirs(models_dir, exist_ok=True)
+    best_model_path = os.path.join(models_dir, "best_model.pth")
+    best_val_loss = float('inf')
+
     num_epochs = config['epochs']
     for epoch in range(num_epochs):
         # TRAIN
@@ -127,7 +135,7 @@ if __name__ == "__main__":
         Logger.current_logger().report_scalar("train", "loss", iteration=epoch, value=train_loss)
         Logger.current_logger().report_scalar("train", "ROUGE1", iteration=epoch, value=train_rouge1)
         Logger.current_logger().report_scalar("train", "ROUGE2", iteration=epoch, value=train_rouge2)
-        print(f'Epoch {epoch + 1}/{num_epochs} — Loss: {train_loss:.4f}, ROUGE1: {train_rouge1:.2f0}%, ROUGE2: {train_rouge2:.2f}%')
+        print(f'Epoch {epoch + 1}/{num_epochs} — Loss: {train_loss:.4f}, ROUGE1: {train_rouge1:.2f}%, ROUGE2: {train_rouge2:.2f}%')
 
         # VALIDATION
         val_loss, val_rouge1, val_rouge2 = evaluate(model, criterion, val_loader, device)
@@ -137,3 +145,21 @@ if __name__ == "__main__":
         Logger.current_logger().report_scalar("val", "ROUGE1", iteration=epoch, value=val_rouge1)
         Logger.current_logger().report_scalar("val", "ROUGE2", iteration=epoch, value=val_rouge2)
         print(f'Val Loss: {val_loss:.4f}, Val ROUGE1: {val_rouge1:.2f}%, , Val ROUGE2: {val_rouge2:.2f}%')
+
+        # Сохранение лучшей модели по валидационной потере
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            # Сохранение состояния модели
+            torch.save({
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'val_loss': val_loss,
+                'val_rouge1': val_rouge1,
+                'val_rouge2': val_rouge2,
+                'config': config
+            }, best_model_path)
+            print(f"Сохранена новая лучшая модель с валидационной потерей: {val_loss:.4f}")
+            # Отправка информации о сохранении в ClearML
+            Logger.current_logger().report_text(
+                f"Сохранена лучшая модель на эпохе {epoch + 1} с val_loss = {val_loss:.4f}")
