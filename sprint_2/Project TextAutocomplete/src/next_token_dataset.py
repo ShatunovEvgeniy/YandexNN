@@ -95,7 +95,7 @@ def create_dataloader(debug:bool = False) -> Tuple[DataLoader, DataLoader, DataL
     Создаёт Dataloader для исходного датасета.
     :param debug: Нужна ли отладочная информация по датасету.
     """
-    config = load_config("dataset_config.yaml")
+    config = load_config("config.yaml")
 
     # Получение пути до файла с обработанными данными
     datafile_name = config["processed_dataset"]

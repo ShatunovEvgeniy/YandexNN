@@ -74,7 +74,7 @@ def save_tokenized_data(tokens: List[int], output_file_path: str, mode: str = 'a
 
 if __name__ == "__main__":
     # Загрузка configs файла
-    data_config = load_config("dataset_config.yaml")
+    data_config = load_config("config.yaml")
 
     # Открытие сырого файла и очистка
     raw_file_name = data_config["raw_dataset"]
