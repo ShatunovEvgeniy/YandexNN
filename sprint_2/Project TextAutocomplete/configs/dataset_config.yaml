@@ -2,7 +2,9 @@ raw_dataset: raw_dataset.txt
 processed_dataset: processed_dataset.txt
 tokenizer: distilgpt2
 
-batch_size: 32
+batch_size: 64
 train_size: 0.8
 val_size: 0.1
 test_size: 0.1
+
+hidden_dim: 128
