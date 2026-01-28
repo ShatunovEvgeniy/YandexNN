@@ -34,67 +34,69 @@ class TextAutocompleteLSTM(nn.Module):
         logits = self.fc(lstm_output)
         return logits
 
-    def generate(self, input: str, max_length: int = 50, beam_width: int = 1):
+    def generate(self, input_seq, max_length: int = 50):
         """
-        Генерация n вариантов продолжения с помощью beam search
-        Возвращает: список кортежей (текст, вероятность)
+        Упрощенная версия generate
         """
         self.eval()
+        device = next(self.parameters()).device
+
+        # Преобразуем input_seq в тензор, если нужно
+        if not isinstance(input_seq, torch.Tensor):
+            input_seq = torch.tensor(input_seq, dtype=torch.long)
+
+        input_seq = input_seq.to(device)
+
         with torch.no_grad():
-            input_ids = self.tokenizer.encode(input, return_tensors='pt')  # [1, seq_len]
-            hidden = None
+            batch_size = input_seq.size(0)
+            generated_sequences = []
 
-            # Beam search state: (последовательность, логарифм вероятности, hidden state)
-            beams = [(input_ids.clone(), 0.0, hidden)]  # [(tensor, log_prob, hidden)]
+            for batch_idx in range(batch_size):
+                # Берем один пример из батча
+                seq = input_seq[batch_idx]
 
-            for step in range(max_length):
-                new_beams = []
-                all_candidates = []
+                # Удаляем pad токены (если pad_token_id=0)
+                non_zero_mask = seq != 0
+                if non_zero_mask.any():
+                    seq = seq[non_zero_mask]
 
-                for beam_seq, beam_log_prob, beam_hidden in beams:
-                    # Получаем длины последовательностей
-                    current_lengths = torch.tensor([beam_seq.size(1)], dtype=torch.long)
+                # Если последовательность пустая, пропускаем
+                if len(seq) == 0:
+                    generated_sequences.append(torch.tensor([], dtype=torch.long))
+                    continue
 
-                    # Forward pass
-                    embedded = self.emb(beam_seq)
-                    packed_input = pack_padded_sequence(embedded, current_lengths, batch_first=True,
-                                                        enforce_sorted=True)
-                    packed_output, (h_n, c_n) = self.lstm(packed_input, beam_hidden if beam_hidden else None)
-                    output, _ = pad_packed_sequence(packed_output, batch_first=True)
-                    logits = self.fc(output[:, -1, :])  # Только последний токен
+                # Готовим вход для LSTM
+                current_input = seq.unsqueeze(0)  # [1, seq_len]
 
-                    # Получаем топ-k наиболее вероятных следующих токенов
-                    topk_probs, topk_indices = torch.topk(torch.softmax(logits, dim=-1), k=beam_width, dim=-1)
+                # Получаем hidden state из контекста
+                embedded = self.emb(current_input)
+                _, (h_n, c_n) = self.lstm(embedded)
 
-                    for i in range(beam_width):
-                        next_token_id = topk_indices[0, i].unsqueeze(0).unsqueeze(0)  # [1, 1]
-                        token_prob = topk_probs[0, i].item()
+                # Генерация
+                generated_tokens = []
 
-                        # Создаем новую последовательность
-                        new_seq = torch.cat([beam_seq, next_token_id], dim=1)
-                        new_log_prob = beam_log_prob + math.log(token_prob + 1e-10)  # избегаем log(0)
+                for _ in range(max_length):
+                    # Берем последний токен
+                    if len(generated_tokens) > 0:
+                        last_token = torch.tensor([[generated_tokens[-1]]], device=device)
+                    else:
+                        last_token = current_input[:, -1:]
 
-                        # Проверяем, достигли ли EOS
-                        if next_token_id.item() == self.tokenizer.eos_token_id:
-                            all_candidates.append((new_seq, new_log_prob, None))
-                        else:
-                            new_beams.append((new_seq, new_log_prob, (h_n.clone(), c_n.clone())))
+                    # Прямой проход
+                    embedded = self.emb(last_token)
+                    lstm_out, (h_n, c_n) = self.lstm(embedded, (h_n, c_n))
+                    logits = self.fc(lstm_out.squeeze(1))
 
-                # Сортируем все кандидаты по вероятности и выбираем лучшие beam_width
-                all_candidates.extend(new_beams)
-                all_candidates.sort(key=lambda x: x[1], reverse=True)  # сортировка по log_prob
-                beams = all_candidates[:beam_width]
+                    # Greedy выбор
+                    next_token = torch.argmax(logits, dim=-1)
 
-                # Проверяем, все ли последовательности завершились EOS
-                if all(beam[0][0, -1].item() == self.tokenizer.eos_token_id for beam in beams):
-                    break
+                    # Проверка на EOS
+                    if next_token.item() == self.tokenizer.eos_token_id:
+                        break
 
-            # Декодируем результаты
-            results = []
-            for beam_seq, log_prob, _ in beams:
-                text = self.tokenizer.decode(beam_seq[0], skip_special_tokens=False)
-                # Нормализуем вероятность по длине
-                normalized_prob = math.exp(log_prob / beam_seq.size(1))
-                results.append((text, normalized_prob))
+                    generated_tokens.append(next_token.item())
 
-            return results
+                # Сохраняем результат
+                generated_sequences.append(torch.tensor(generated_tokens, dtype=torch.long))
+
+            return generated_sequences
