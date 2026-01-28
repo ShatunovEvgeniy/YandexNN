@@ -33,16 +33,7 @@ def train_epoch(model: nn.Module,
                          target_seq.reshape(-1))
         loss.backward()
         optimizer.step()
-
         total_loss += loss.item()
-
-        # Декодируем ПРЕДСКАЗАНИЯ в текст
-        probs = torch.softmax(logits, dim=-1)
-        output_indices = torch.argmax(probs, dim=-1)
-        output_text = model.tokenizer.batch_decode(output_indices, skip_special_tokens=True)
-
-        # Декодируем ЦЕЛЕВЫЕ ПОСЛЕДОВАТЕЛЬНОСТИ в текст
-        target_text = model.tokenizer.batch_decode(target_seq, skip_special_tokens=True)
 
         # Вычисляем ROUGE метрики
         if i % 10 == 0:  # Вычислять метрики реже
@@ -148,9 +139,12 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
 
     # Подготовка к сохранению модели
-    models_dir = os.path.join("..", "models")
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(current_dir)
+    models_dir = os.path.join(project_root, 'models')
     os.makedirs(models_dir, exist_ok=True)
     best_model_path = os.path.join(models_dir, "best_model.pth")
+    print("Path for saving a model:", best_model_path)
     best_val_loss = float('inf')
 
     num_epochs = config['epochs']
