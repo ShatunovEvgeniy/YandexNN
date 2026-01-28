@@ -183,3 +183,4 @@ cython_debug/
 /.idea
 *.txt
 sprint_2/Project TextAutocomplete/sandbox.py
+/sprint_2/Project TextAutocomplete/models
