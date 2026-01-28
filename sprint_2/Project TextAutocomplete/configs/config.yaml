@@ -4,11 +4,13 @@ tokenizer: distilgpt2
 transformer_model: distilgpt2
 pad_token: <PAD>
 
-batch_size: 256
+batch_size: 128
 train_size: 0.8
 val_size: 0.1
 test_size: 0.1
 
 hidden_dim: 128
 
-epochs: 30
+epochs: 3
+
+weights: best_weights_2.pth
