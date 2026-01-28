@@ -4,7 +4,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from transformers import AutoTokenizer
 import math
 
-from utils import load_config
+from src.utils import load_config
 
 
 class TextAutocompleteLSTM(nn.Module):

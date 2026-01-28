@@ -5,10 +5,10 @@ from torch.utils.data import DataLoader
 from clearml import Task, Logger
 import os.path
 
-from utils import load_config
-from lstm_model import TextAutocompleteLSTM
-from next_token_dataset import create_dataloaders
-from eval_lstm import calculate_rouge_metrics
+from src.utils import load_config
+from src.lstm_model import TextAutocompleteLSTM
+from src.next_token_dataset import create_dataloaders
+from src.eval_lstm import calculate_rouge_metrics
 
 
 def train_epoch(model: nn.Module,

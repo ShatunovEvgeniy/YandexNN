@@ -1,5 +1,5 @@
 import evaluate
-from typing import List, Union
+from typing import List
 
 
 def calculate_rouge_metrics(hypotheses: List[str], references: List[str]) -> dict:

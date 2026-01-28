@@ -3,7 +3,7 @@ import os
 from typing import List
 from transformers import AutoTokenizer
 
-from utils import load_config
+from src.utils import load_config
 
 
 def read_file(filename: str) -> str | None:
@@ -73,7 +73,7 @@ def save_tokenized_data(tokens: List[int], output_file_path: str, mode: str = 'a
 
 
 if __name__ == "__main__":
-    # Загрузка configs файла
+    # Загрузка config файла
     data_config = load_config("config.yaml")
 
     # Открытие сырого файла и очистка
