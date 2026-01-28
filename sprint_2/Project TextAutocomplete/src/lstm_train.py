@@ -13,6 +13,7 @@ from src.eval_lstm import calculate_rouge_metrics
 
 def train_epoch(model: nn.Module,
                 loader: DataLoader,
+                tokenizer: AutoTokenizer,
                 optimizer: torch.optim.Optimizer,
                 criterion,
                 device):
@@ -28,7 +29,7 @@ def train_epoch(model: nn.Module,
         target_seq = batch['target_seq'].to(device)
 
         optimizer.zero_grad()
-        logits = model(input_seq, lengths)
+        logits, _ = model(input_seq, lengths)
         loss = criterion(logits.reshape(-1, logits.size(-1)),
                          target_seq.reshape(-1))
         loss.backward()
@@ -45,8 +46,8 @@ def train_epoch(model: nn.Module,
 
                 probs = torch.softmax(sample_logits, dim=-1)
                 output_indices = torch.argmax(probs, dim=-1)
-                output_text = model.tokenizer.batch_decode(output_indices, skip_special_tokens=True)
-                target_text = model.tokenizer.batch_decode(sample_target, skip_special_tokens=True)
+                output_text = tokenizer.batch_decode(output_indices, skip_special_tokens=True)
+                target_text = tokenizer.batch_decode(sample_target, skip_special_tokens=True)
 
                 metrics = calculate_rouge_metrics(output_text, target_text)
                 total_rouge1 += metrics['rouge1']
@@ -63,7 +64,7 @@ def train_epoch(model: nn.Module,
     return avg_loss, avg_rouge1, avg_rouge2
 
 
-def evaluate(model: nn.Module, criterion, loader: DataLoader, device) -> tuple:
+def evaluate(model: nn.Module, tokenizer: AutoTokenizer, criterion, loader: DataLoader, device) -> tuple:
     model.eval()
     total_rouge1 = 0
     total_rouge2 = 0
@@ -77,7 +78,7 @@ def evaluate(model: nn.Module, criterion, loader: DataLoader, device) -> tuple:
             lengths = batch['lengths']
             target_seq = batch['target_seq'].to(device)
 
-            logits = model(input_seq, lengths)
+            logits, _ = model(input_seq, lengths)
             loss = criterion(logits.reshape(-1, logits.size(-1)),
                              target_seq.reshape(-1))
             total_loss += loss.item()
@@ -90,8 +91,8 @@ def evaluate(model: nn.Module, criterion, loader: DataLoader, device) -> tuple:
 
                 probs = torch.softmax(sample_logits, dim=-1)
                 output_indices = torch.argmax(probs, dim=-1)
-                output_text = model.tokenizer.batch_decode(output_indices, skip_special_tokens=True)
-                target_text = model.tokenizer.batch_decode(sample_target, skip_special_tokens=True)
+                output_text = tokenizer.batch_decode(output_indices, skip_special_tokens=True)
+                target_text = tokenizer.batch_decode(sample_target, skip_special_tokens=True)
 
                 metrics = calculate_rouge_metrics(output_text, target_text)
                 total_rouge1 += metrics['rouge1']
@@ -128,7 +129,8 @@ if __name__ == "__main__":
     hidden_dim = config["hidden_dim"]
     model = TextAutocompleteLSTM(vocab_size=vocab_size,
                                  hidden_dim=hidden_dim,
-                                 padding_idx=pad_token_id)
+                                 padding_idx=pad_token_id,
+                                 eos_idx=tokenizer.eos_token_id)
     model = model.to(device)
 
     # Загрузка Dataloaders
@@ -150,7 +152,7 @@ if __name__ == "__main__":
     num_epochs = config['epochs']
     for epoch in range(num_epochs):
         # TRAIN
-        train_loss, train_rouge1, train_rouge2 = train_epoch(model, train_loader, optimizer, criterion, device)
+        train_loss, train_rouge1, train_rouge2 = train_epoch(model, train_loader, tokenizer, optimizer, criterion, device)
 
         # Отправка метрик в ClearML
         Logger.current_logger().report_scalar("train", "loss", iteration=epoch, value=train_loss)
@@ -159,7 +161,7 @@ if __name__ == "__main__":
         print(f'Epoch {epoch + 1}/{num_epochs} — Loss: {train_loss:.4f}, ROUGE1: {train_rouge1:.2f}%, ROUGE2: {train_rouge2:.2f}%')
 
         # VALIDATION
-        val_loss, val_rouge1, val_rouge2 = evaluate(model, criterion, val_loader, device)
+        val_loss, val_rouge1, val_rouge2 = evaluate(model, tokenizer, criterion, val_loader, device)
 
         # Отправка метрик в ClearML
         Logger.current_logger().report_scalar("val", "loss", iteration=epoch, value=val_loss)
