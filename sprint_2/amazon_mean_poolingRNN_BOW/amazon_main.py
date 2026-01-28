@@ -47,7 +47,7 @@ class MeanPoolingRNN(nn.Module):
     def init_weights(self):
         nn.init.xavier_uniform_(self.fc.weight)
         for name, param in self.rnn.named_parameters():
-            if "weight" in name:  # Исправлено: правильная проверка имени параметра
+            if "weight" in name:
                 nn.init.xavier_uniform_(param)
 
     def forward(self, input_ids, mask):
