@@ -44,6 +44,9 @@
 
 ### Данные
 - **Исходный датасет:** sentiment140 с короткими текстовыми постами
+```bash
+wget -P ./data/raw_dataset.txt https://code.s3.yandex.net/deep-learning/tweets.txt
+```
 - **Подготовка данных:**
   - Приведение к нижнему регистру
   - Удаление ссылок, упоминаний, эмодзи
@@ -143,4 +146,9 @@ text-autocomplete/
 ```bash
 # Установка зависимостей
 pip install -r requirements.txt
+```
+
+Для установки корня проекта:
+```bash
+$env:PYTHONPATH="C:\YandexNN\sprint_2\Project TextAutocomplete"
 ```
