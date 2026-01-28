@@ -44,10 +44,11 @@ class TextAutocompleteDataset(Dataset):
         }
 
 
-def load_and_preprocess_data(file_path: str) -> List:
+def load_and_preprocess_data(file_path: str, all_data: bool) -> List:
     """
     Читает txt файл, где каждая строка содержит числа (токены), разделенные пробелами.
     Возвращает одномерный массив всех токенов.
+    :param all_data: Нужны ли все данные или демонстрационная часть.
     """
     try:
         data = []
@@ -57,7 +58,8 @@ def load_and_preprocess_data(file_path: str) -> List:
                 tokens = [int(token) for token in line.strip().split() if token.strip()]
                 data.append(tokens)
                 i += 1
-                if i == 10: break
+                if i == 100 and not all_data:
+                    break
 
         print(f"Successfully loaded {len(data)} data points from {file_path}")
         return data
@@ -83,10 +85,11 @@ def _collate_fn(batch, pad_token_id: int) -> Dict[str, Any]:
     }
 
 
-def create_dataloaders(debug: bool = False) -> Tuple[DataLoader, DataLoader, DataLoader]:
+def create_dataloaders(debug: bool = False, all_data: bool = True) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Создаёт Dataloader для исходного датасета.
     :param debug: Нужна ли отладочная информация по датасету.
+    :param all_data: Нужны ли все данные или демонстрационная часть.
     """
     config = load_config("config.yaml")
 
@@ -98,7 +101,7 @@ def create_dataloaders(debug: bool = False) -> Tuple[DataLoader, DataLoader, Dat
     datafile_path = os.path.join(data_dir, datafile_name)
 
     # Загрузка данных в numpy массив
-    data = load_and_preprocess_data(datafile_path)
+    data = load_and_preprocess_data(datafile_path, all_data)
 
     train_end_idx = int(config["train_size"] * len(data))
     val_end_idx = int((config["train_size"] + config["val_size"]) * len(data))
