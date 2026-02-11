@@ -130,8 +130,6 @@ l1, v1 = train_model(m1)
 l2, v2 = train_model(m2)
 l3, v3 = train_model(m3) # L1-регуляризация
 
-
-
 # Построение сравнительных кривых
 plt.figure(figsize=(8,5))
 plt.plot(v0, '--', label='Val (без рег.)')
