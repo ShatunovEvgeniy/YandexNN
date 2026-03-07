@@ -33,10 +33,10 @@ class Config:
     # Пути
     TRAIN_DF_PATH = dataset_path / "imdb_train.csv"
     VAL_DF_PATH = dataset_path / "imdb_val.csv"
-    SAVE_PATH = BASE_DIR / "models" / "multimodal" / "best_model.pth"
+    SAVE_PATH = BASE_DIR / "models" / "multimodal" / "best_model_img_mask.pth"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(device)
 
 cfg = Config()
-train(cfg, device)
+train(cfg, device, mask="image")

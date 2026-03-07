@@ -20,7 +20,7 @@ df_path = dataset_path / "imdb_train.csv"
 
 class MultimodalDataset(Dataset):
 
-    def __init__(self, config, transforms, ds_type="train"):
+    def __init__(self, config, transforms, ds_type="train", mask=None):
         if ds_type == "train":
             self.df = pd.read_csv(config.TRAIN_DF_PATH)
         else:
@@ -28,6 +28,7 @@ class MultimodalDataset(Dataset):
         self.image_cfg = timm.get_pretrained_cfg(config.IMAGE_MODEL_NAME)
         self.tokenizer = AutoTokenizer.from_pretrained(config.TEXT_MODEL_NAME)
         self.transforms = transforms
+        self.mask = mask
 
     def __len__(self):
         return len(self.df)
@@ -38,7 +39,15 @@ class MultimodalDataset(Dataset):
 
         img_path = self.df.loc[idx, "movie_id"]
         try:
-            image = Image.open(images_path / img_path).convert('RGB')
+            image = Image.open(f"data/imdb_images/{img_path}.jpg").convert('RGB')
+            if self.mask == "image":
+                image = torch.randint(0, 255, (*self.image_cfg.input_size[1:],
+                                           self.image_cfg.input_size[0])).to(
+                                               torch.float32)
+            elif self.mask == "text":
+                text = "text"
+            else:
+                image = Image.open(images_path / img_path).convert('RGB')
         except:
             image = torch.randint(0, 255, (*self.image_cfg.input_size[1:],
                                            self.image_cfg.input_size[0])).to(

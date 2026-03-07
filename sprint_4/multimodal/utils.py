@@ -78,7 +78,7 @@ class MultimodalModel(nn.Module):
         return logits
 
 
-def train(config, device):
+def train(config, device, mask=None):
     seed_everything(config.SEED)
 
     # Инициализация модели
@@ -107,8 +107,8 @@ def train(config, device):
     # Загрузка данных
     transforms = get_transforms(config)
     val_transforms = get_transforms(config, ds_type="val")
-    train_dataset = MultimodalDataset(config, transforms)
-    val_dataset = MultimodalDataset(config, val_transforms, ds_type="val")
+    train_dataset = MultimodalDataset(config, transforms, mask=mask)
+    val_dataset = MultimodalDataset(config, val_transforms, ds_type="val", mask=mask)
     train_loader = DataLoader(train_dataset,
                               batch_size=config.BATCH_SIZE,
                               shuffle=True,
