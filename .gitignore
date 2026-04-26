@@ -185,3 +185,4 @@ cython_debug/
 */models
 */data
 /.idea
+*.pth
